@@ -57,14 +57,21 @@ using namespace std;
 int main()
 {
     //Shared Memory Allocation
-    key_t key_arr = ftok("/home/rohan/Desktop/shmfile_arr1", 65);
-
-    int shmid_arr = shmget(key_arr, 13 * sizeof(int), 0666 | IPC_CREAT);
-
+    int shmid_arr = shmget(IPC_PRIVATE, 22 * sizeof(int), 0666 | IPC_CREAT);
+    
     int *arr = (int *)shmat(shmid_arr, (void *)0, 0);    
 
-    cout << "Enter 8 elements" << endl;
-    for (int i = 1; i <= 8; i++)
+    int n;
+    cout<<"Enter the number of elements (must be <= 20 and even)"<<endl;
+    cin>>n;
+    while(n > 20 || n < 1 || n % 2 != 0)
+    {
+        cout<<"Re - enter the number of elements (must be <= 20 and even)"<<endl;
+        cin>>n;
+    }
+    
+    cout << "Enter " << n << " elements" << endl;
+    for (int i = 1; i <= n; i++)
     {
         cin >> arr[i];
     }
@@ -72,204 +79,73 @@ int main()
     Semaphore SEM_BEGIN("begin", false, 0),
         SEM_NEXTPASS("nextpass", false, 0),
         SEM_PASSCOUNT("passcount", true, 0),
-        SEM_READCOUNT("readcount", true, 4),
-        SEM_EXECCOUNT("execcount", true, 4),
-        SEM_WRITECOUNT("writecount", true, 4),
+        SEM_READCOUNT("readcount", true, n / 2),
+        SEM_EXECCOUNT("execcount", true, n / 2),
+        SEM_WRITECOUNT("writecount", true, n / 2),
         SEM_NOOFWAITINGPROCESSES("noofwaitingprocesses", true, 0);
         
-    // Process 1
-    if (!fork())
+    for(int process = 1; process <= n / 2; process++)
     {
-        int *arr = (int *)shmat(shmid_arr, (void *)0, 0);
-        while (!SEM_BEGIN.getvalue())
-            ;
-        while (SEM_PASSCOUNT.getvalue() < 8)
+        if (!fork())
         {
-            int i = 1, j = 2;
-            // READ
-            bool odd = (SEM_PASSCOUNT.getvalue() + 1) & 1;
-            if (!odd)
+            int *arr = (int *)shmat(shmid_arr, (void *)0, 0);
+            while (!SEM_BEGIN.getvalue())
+                ;
+            bool lastProc = (process == n / 2);
+            while (SEM_PASSCOUNT.getvalue() < n)
             {
-                i++, j++;
+                int i = 2 * process - 1, j = 2 * process;
+                // READ
+                bool odd = (SEM_PASSCOUNT.getvalue() + 1) & 1;
+                if (!odd)
+                {
+                    i++, j++;
+                }
+                int tmp1, tmp2;
+                if(lastProc)
+                {
+                    tmp1 = odd ? arr[i] : 0;
+                    tmp2 = odd ? arr[j] : 0;
+                }
+                else
+                {
+                    tmp1 = arr[i];
+                    tmp2 = arr[j];
+                }
+                // READCOUNT--
+                SEM_READCOUNT.decr();
+                // wait while READCOUNT > 0
+                while (SEM_READCOUNT.getvalue() > 0)
+                    ;
+                // EXECUTE
+                if (tmp1 > tmp2)
+                    swap(tmp1, tmp2);
+                // SET NEXTPASS to false
+                SEM_NEXTPASS.unset();
+                //  EXECCOUNT--
+                SEM_EXECCOUNT.decr();
+                //  wait while EXECCOUNT > 0
+                while (SEM_EXECCOUNT.getvalue() > 0)
+                    ;
+                // WRITE
+                if (!lastProc || odd)
+                {
+                    arr[i] = tmp1;
+                    arr[j] = tmp2;
+                }
+                // WRITECOUNT--
+                SEM_WRITECOUNT.decr();
+                // wait while WRITECOUNT > 0
+                while (SEM_WRITECOUNT.getvalue() > 0)
+                    ;
+                // increment NoOfWaitingProcesses
+                SEM_NOOFWAITINGPROCESSES.incr();
+                while (!SEM_NEXTPASS.getvalue())
+                    ;
             }
-            int tmp1 = arr[i];
-            int tmp2 = arr[j];
-            // READCOUNT--
-            SEM_READCOUNT.decr();
-            // wait while READCOUNT > 0
-            while (SEM_READCOUNT.getvalue() > 0);
-            // EXECUTE
-            if (tmp1 > tmp2)
-                swap(tmp1, tmp2);
-            // SET NEXTPASS to false
-            SEM_NEXTPASS.unset();
-            //  EXECCOUNT--
-            SEM_EXECCOUNT.decr();
-            //  wait while EXECCOUNT > 0
-            while (SEM_EXECCOUNT.getvalue() > 0)
-                ;
-            // WRITE
-            arr[i] = tmp1;
-            arr[j] = tmp2;
-            // WRITECOUNT--
-            SEM_WRITECOUNT.decr();
-            // wait while WRITECOUNT > 0
-            while (SEM_WRITECOUNT.getvalue() > 0)
-                ;
-            // increment NoOfWaitingProcesses
-            SEM_NOOFWAITINGPROCESSES.incr();
-            while (!SEM_NEXTPASS.getvalue())
-                ;
+            shmdt(arr);
+            exit(0);
         }
-        shmdt(arr);
-        exit(0);
-    }
-    // Process 2
-    if (!fork())
-    {
-        int *arr = (int *)shmat(shmid_arr, (void *)0, 0);
-        while (!SEM_BEGIN.getvalue())
-            ;
-        while (SEM_PASSCOUNT.getvalue() < 8)
-        {
-            int i = 3, j = 4;
-            // READ
-            bool odd = (SEM_PASSCOUNT.getvalue() + 1) & 1;
-            if (!odd)
-            {
-                i++, j++;
-            }
-            int tmp1 = arr[i];
-            int tmp2 = arr[j];
-            // READCOUNT--
-            SEM_READCOUNT.decr();
-            // wait while READCOUNT > 0
-            while (SEM_READCOUNT.getvalue() > 0)
-                ;
-            // EXECUTE
-            if (tmp1 > tmp2)
-                swap(tmp1, tmp2);
-            // SET NEXTPASS to false
-            SEM_NEXTPASS.unset();
-            //  EXECCOUNT--
-            SEM_EXECCOUNT.decr();
-            //  wait while EXECCOUNT > 0
-            while (SEM_EXECCOUNT.getvalue() > 0)
-                ;
-            // WRITE
-            arr[i] = tmp1;
-            arr[j] = tmp2;
-            // WRITECOUNT--
-            SEM_WRITECOUNT.decr();
-            // wait while WRITECOUNT > 0
-            while (SEM_WRITECOUNT.getvalue() > 0)
-                ;
-            // increment NoOfWaitingProcesses
-            SEM_NOOFWAITINGPROCESSES.incr();
-            while (!SEM_NEXTPASS.getvalue())
-                ;
-        }
-        shmdt(arr);
-        exit(0);
-    }
-    // Process 3
-    if (!fork())
-    {
-        int *arr = (int *)shmat(shmid_arr, (void *)0, 0);
-        while (!SEM_BEGIN.getvalue())
-            ;
-        while (SEM_PASSCOUNT.getvalue() < 8)
-        {
-            int i = 5, j = 6;
-            // READ
-            bool odd = (SEM_PASSCOUNT.getvalue() + 1) & 1;
-            if (!odd)
-            {
-                i++, j++;
-            }
-            int tmp1 = arr[i];
-            int tmp2 = arr[j];
-            // READCOUNT--
-            SEM_READCOUNT.decr();
-            // wait while READCOUNT > 0
-            while (SEM_READCOUNT.getvalue() > 0)
-                ;
-            // EXECUTE
-            if (tmp1 > tmp2)
-                swap(tmp1, tmp2);
-            // SET NEXTPASS to false
-            SEM_NEXTPASS.unset();
-            //  EXECCOUNT--
-            SEM_EXECCOUNT.decr();
-            //  wait while EXECCOUNT > 0
-            while (SEM_EXECCOUNT.getvalue() > 0)
-                ;
-            // WRITE
-            arr[i] = tmp1;
-            arr[j] = tmp2;
-            // WRITECOUNT--
-            SEM_WRITECOUNT.decr();
-            // wait while WRITECOUNT > 0
-            while (SEM_WRITECOUNT.getvalue() > 0)
-                ;
-            // increment NoOfWaitingProcesses
-            SEM_NOOFWAITINGPROCESSES.incr();
-            while (!SEM_NEXTPASS.getvalue())
-                ;
-        }
-        shmdt(arr);
-        exit(0);
-    }
-    // Process 4
-    if (!fork())
-    {
-        int *arr = (int *)shmat(shmid_arr, (void *)0, 0);
-        while (!SEM_BEGIN.getvalue())
-            ;
-        while (SEM_PASSCOUNT.getvalue() < 8)
-        {
-            int i = 7, j = 8;
-            // READ
-            bool odd = (SEM_PASSCOUNT.getvalue() + 1) & 1;
-            if (!odd)
-            {
-                i++, j++;
-            }
-            int tmp1 = odd ? arr[i] : 0;
-            int tmp2 = odd ? arr[j] : 0;
-            // READCOUNT--
-            SEM_READCOUNT.decr();
-            // wait while READCOUNT > 0
-            while (SEM_READCOUNT.getvalue() > 0)
-                ;
-            // EXECUTE
-            if (tmp1 > tmp2)
-                swap(tmp1, tmp2);
-            // SET NEXTPASS to false
-            SEM_NEXTPASS.unset();
-            //  EXECCOUNT--
-            SEM_EXECCOUNT.decr();
-            //  wait while EXECCOUNT > 0
-            while (SEM_EXECCOUNT.getvalue() > 0)
-                ;
-            // WRITE
-            if (odd)
-            {
-                arr[i] = tmp1;
-                arr[j] = tmp2;
-            }
-            // WRITECOUNT--
-            SEM_WRITECOUNT.decr();
-            // wait while WRITECOUNT > 0
-            while (SEM_WRITECOUNT.getvalue() > 0)
-                ;
-            // increment NoOfWaitingProcesses
-            SEM_NOOFWAITINGPROCESSES.incr();
-            while (!SEM_NEXTPASS.getvalue())
-                ;
-        }
-        shmdt(arr);
-        exit(0);
     }
     
     
@@ -277,30 +153,30 @@ int main()
     // Set begin semaphore to true
     SEM_BEGIN.set();
     
-    for (int pass = 0; pass <= 7; pass++)
+    for (int pass = 0; pass <= n - 1; pass++)
     {
-        // wait while NoOfWaitingProcesses < 4
-        while (SEM_NOOFWAITINGPROCESSES.getvalue() < 4)
+        // wait while NoOfWaitingProcesses < n / 2
+        while (SEM_NOOFWAITINGPROCESSES.getvalue() < n / 2)
             ;
         // incr passcount
         SEM_PASSCOUNT.incr();
         // set NoOfWaitingProcesses to 0
         while (SEM_NOOFWAITINGPROCESSES.getvalue() > 0)
             SEM_NOOFWAITINGPROCESSES.decr();
-        // set READCOUNT to 4
-        while (SEM_READCOUNT.getvalue() < 4)
+        // set READCOUNT to n / 2
+        while (SEM_READCOUNT.getvalue() < n / 2)
             SEM_READCOUNT.incr();
-        // set WRITECOUNT to 4
-        while (SEM_WRITECOUNT.getvalue() < 4)
+        // set WRITECOUNT to n / 2
+        while (SEM_WRITECOUNT.getvalue() < n / 2)
             SEM_WRITECOUNT.incr();
-        // set EXECCOUNT to 4
-        while (SEM_EXECCOUNT.getvalue() < 4)
+        // set EXECCOUNT to n / 2
+        while (SEM_EXECCOUNT.getvalue() < n / 2)
             SEM_EXECCOUNT.incr();
         // set NEXTPASS to true
         SEM_NEXTPASS.set();
     }
     // display the arr
-    for (int i = 1; i <= 8; i++)
+    for (int i = 1; i <= n; i++)
     {
         cout << arr[i] << ' ';
     }
