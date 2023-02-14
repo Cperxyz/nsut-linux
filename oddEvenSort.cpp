@@ -112,19 +112,14 @@ int main()
                     tmp1 = arr[i];
                     tmp2 = arr[j];
                 }
-                // READCOUNT--
                 SEM_READCOUNT.decr();
-                // wait while READCOUNT > 0
                 while (SEM_READCOUNT.getvalue() > 0)
                     ;
                 // EXECUTE
                 if (tmp1 > tmp2)
                     swap(tmp1, tmp2);
-                // SET NEXTPASS to false
                 SEM_NEXTPASS.unset();
-                //  EXECCOUNT--
                 SEM_EXECCOUNT.decr();
-                //  wait while EXECCOUNT > 0
                 while (SEM_EXECCOUNT.getvalue() > 0)
                     ;
                 // WRITE
@@ -133,12 +128,9 @@ int main()
                     arr[i] = tmp1;
                     arr[j] = tmp2;
                 }
-                // WRITECOUNT--
                 SEM_WRITECOUNT.decr();
-                // wait while WRITECOUNT > 0
                 while (SEM_WRITECOUNT.getvalue() > 0)
                     ;
-                // increment NoOfWaitingProcesses
                 SEM_NOOFWAITINGPROCESSES.incr();
                 while (!SEM_NEXTPASS.getvalue())
                     ;
@@ -150,32 +142,23 @@ int main()
     
     
     
-    // Set begin semaphore to true
     SEM_BEGIN.set();
     
     for (int pass = 0; pass <= n - 1; pass++)
     {
-        // wait while NoOfWaitingProcesses < n / 2
         while (SEM_NOOFWAITINGPROCESSES.getvalue() < n / 2)
             ;
-        // incr passcount
         SEM_PASSCOUNT.incr();
-        // set NoOfWaitingProcesses to 0
         while (SEM_NOOFWAITINGPROCESSES.getvalue() > 0)
             SEM_NOOFWAITINGPROCESSES.decr();
-        // set READCOUNT to n / 2
         while (SEM_READCOUNT.getvalue() < n / 2)
             SEM_READCOUNT.incr();
-        // set WRITECOUNT to n / 2
         while (SEM_WRITECOUNT.getvalue() < n / 2)
             SEM_WRITECOUNT.incr();
-        // set EXECCOUNT to n / 2
         while (SEM_EXECCOUNT.getvalue() < n / 2)
             SEM_EXECCOUNT.incr();
-        // set NEXTPASS to true
         SEM_NEXTPASS.set();
     }
-    // display the arr
     for (int i = 1; i <= n; i++)
     {
         cout << arr[i] << ' ';
