@@ -30,6 +30,7 @@ public:
     }
     void decr()
     {
+//         if(getvalue() <= 0) return;
         sem_wait(mutex);
     }
     void set()
