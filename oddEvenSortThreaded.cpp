@@ -14,7 +14,7 @@ class Semaphore
 {
 private:
     bool counting;
-    sem_t *mutex;
+    sem_t mutex;
 
 public:
     Semaphore()
@@ -24,18 +24,15 @@ public:
     Semaphore(char *SEM_NAME, bool counting, int count = 1)
     {
         this->counting = counting;
-        sem_unlink(SEM_NAME);
-        mutex = sem_open(SEM_NAME,
-                         O_CREAT, S_IRUSR | S_IWUSR, count);
+        sem_init(&mutex, 1, count);
     }
     void incr()
     {
-        sem_post(mutex);
+        sem_post(&mutex);
     }
     void decr()
     {
-//         if(getvalue() <= 0) return;
-        sem_wait(mutex);
+        sem_wait(&mutex);
     }
     void set()
     {
@@ -50,7 +47,7 @@ public:
     int getvalue()
     {
         int value;
-        sem_getvalue(mutex, &value);
+        sem_getvalue(&mutex, &value);
         return value;
     }
 };
@@ -73,7 +70,6 @@ using namespace std;
 void* threadFn(void* ptr)
 {
     int thread = *((int*)ptr);
-    free(ptr);
     while (!SEM_BEGIN.getvalue())
         ;
     bool lastProc = (thread == n / 2);
@@ -184,6 +180,5 @@ int main()
     }
     cout << endl;
 
-    free(arr);
     return 0;
 }
