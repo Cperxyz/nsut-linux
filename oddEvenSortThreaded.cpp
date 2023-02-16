@@ -67,6 +67,11 @@ using namespace std;
 
 #define endl '\n'
 
+void log(long int th_id, int th_rnk, int t1, int t2)
+{
+    printf("Thread %ld | %d --> Swapped %d and %d\n", th_id, th_rnk, t1, t2);
+}
+
 void* threadFn(void* ptr)
 {
     int thread = *((int*)ptr);
@@ -98,7 +103,10 @@ void* threadFn(void* ptr)
             ;
         // EXECUTE
         if (tmp1 > tmp2)
+        {
             swap(tmp1, tmp2);
+            log(pthread_self(), thread, tmp1, tmp2);
+        }
         SEM_NEXTPASS.unset();
         SEM_EXECCOUNT.decr();
         while (SEM_EXECCOUNT.getvalue() > 0)
@@ -166,6 +174,14 @@ int main()
             SEM_WRITECOUNT.incr();
         while (SEM_EXECCOUNT.getvalue() < n / 2)
             SEM_EXECCOUNT.incr();
+        
+        printf("Main Function --> after pass %d:\n", pass);
+        for(int i = 1; i <= n; i++)
+        {
+            printf("%d ", arr[i]);
+        }
+        printf("\n");
+        
         SEM_NEXTPASS.set();
     }
     
